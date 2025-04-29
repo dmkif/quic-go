@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/netip"
 	"os"
+	"runtime"
 	"strconv"
 	"syscall"
 	"unsafe"
@@ -58,7 +59,14 @@ func parseIPv4PktInfo(body []byte) (ip netip.Addr, ifIndex uint32, ok bool) {
 	if len(body) != 12 {
 		return netip.Addr{}, 0, false
 	}
-	return netip.AddrFrom4(*(*[4]byte)(body[8:12])), binary.LittleEndian.Uint32(body), true
+	ip = netip.AddrFrom4(*(*[4]byte)(body[8:12]))
+	switch runtime.GOARCH {
+	case "s390x", "ppc64", "mips", "mips64":
+		ifIndex = binary.BigEndian.Uint32(body)
+	default:
+		ifIndex = binary.LittleEndian.Uint32(body)
+	}
+	return ip, ifIndex, true
 }
 
 // isGSOEnabled tests if the kernel supports GSO.
